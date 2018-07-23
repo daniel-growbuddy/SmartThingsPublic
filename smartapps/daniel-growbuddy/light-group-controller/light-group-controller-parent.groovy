@@ -16,7 +16,7 @@
  */
 definition(
         name: "Light Group Controller",
-        namespace: "daniel-growbuddy/parent",
+        namespace: "daniel-growbuddy",
         author: "Daniel Starbuck",
         description: "Manage a Group Of Lights Together with a Switch",
         category: "My Apps",
@@ -26,17 +26,35 @@ definition(
 )
 
 preferences {
-    page(name: "mainPage", title: "Light Group Controller", install: true, uninstall: true) {
-        section {
-            app(name: "lightGroupAutomation", appName: "Light Group Automation", namespace: "daniel-growbuddy/automations", title: "Create New Light Group", multiple: true)
+    page(name: "installPage")
+}
+
+def installPage(){
+    dynamicPage(name: "installPage", title:"Light Group Controller", install: true, uninstall: true) {
+        if(!state?.controllerInstalled){
+            section("install"){
+                paragraph "Install Light Group Controller?"
+            }
         }
+
+        if(state?.controllerInstalled){
+            section("Light Group Automation") {
+                app(name: "lightGroupAutomation", appName: "Light Group Automation", namespace: "daniel-growbuddy", title: "Create New Light Group", multiple: true)
+            }
+        }
+
     }
 }
 
 def installed(){
     log.debug "Installed with settings: ${settings}"
     state.nextDni = 1
+    state.controllerInstalled = true
     initialize()
+}
+
+def uninstalled(){
+    state.controllerInstalled = false
 }
 
 def updated() {

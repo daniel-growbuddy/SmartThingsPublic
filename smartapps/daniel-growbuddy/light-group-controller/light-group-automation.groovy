@@ -1,12 +1,12 @@
 definition(
         name: "Light Group Automation",
-        namespace: "daniel-growbuddy/automations",
+        namespace: "daniel-growbuddy",
         author: "Daniel Starbuck",
         description: "A simple app to control light group creation and basic lighting automations.",
         category: "My Apps",
 
         // the parent option allows you to specify the parent app in the form <namespace>/<app name>
-        parent: "daniel-growbuddy/parent:Light Group Controller",
+        parent: "daniel-growbuddy:Light Group Controller",
         iconUrl: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience.png",
         iconX2Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png",
         iconX3Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png")
@@ -28,41 +28,32 @@ def setCurrentInstallNumber(installNumber) {
 // main page to select lights, the action, and turn on/off times
 def mainPage() {
     dynamicPage(name: "mainPage") {
-        deviceInputCreate()
+        section("The Hub") {
+            input "theHub", "hub", title: "Select the hub (required for local execution) (Optional)", multiple: false, required: false
+        }
+        section("Light Type"){
+            input "virtualDeviceType", "enum", title: "Which type of group/virtual device do you want to create?", multiple: false, required: true, options: ["Simulated RGBW Bulb"]
+        }
+        section("Light Control Device Name") {
+            input "deviceName", title: "Enter custom name for the control device", defaultValue: "Light Group ${currentInstallNumber}", required: true
+
+        }
     }
 }
 
 def lightPage() {
     dynamicPage(name: "lightPage") {
-        slaveLightInput()
+        section("Lights to Control"){
+            input "slaveLights", "capability.colorControl", title: "Which lights do you want to control?", multiple: true, submitOnChange: true
+        }
     }
 }
 
 def switchPage() {
     dynamicPage(name: "lightPage") {
-        lightSwitchInput()
-    }
-}
-
-// inputs to select the lights
-def deviceInputCreate() {
-    section("Light Control Device Name"){
-        input "theHub", "hub", title: "Select the hub (required for local execution) (Optional)", multiple: false, required: false
-        input "virtualDeviceType", "enum", title: "Which type of group/virtual device do you want to create?", multiple: false, required: true, options: ["Simulated RGBW Bulb"]
-        input "deviceName", title: "Enter custom name for the control device", defaultValue: "Light Group ${currentInstallNumber}", required: true
-
-    }
-}
-
-def slaveLightInput() {
-    section("Lights to Control"){
-        input "slaveLights", "capability.colorControl", title: "Which lights do you want to control?", multiple: true, submitOnChange: true
-    }
-}
-
-def lightSwitchInput() {
-    section("Light Switch for Control"){
-        input "lightSwitch", "capability.switch", title: "Which switch do you use to control the lights manually?", multiple: false, submitOnChange: true
+        section("Light Switch for Control"){
+            input "lightSwitch", "capability.switch", title: "Which switch do you use to control the lights manually?", multiple: false, submitOnChange: true
+        }
     }
 }
 
