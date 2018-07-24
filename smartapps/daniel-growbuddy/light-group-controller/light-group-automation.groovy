@@ -7,9 +7,8 @@ definition(
 
         // the parent option allows you to specify the parent app in the form <namespace>/<app name> asdf
         parent: "daniel-growbuddy:Light Group Controller",
-        iconUrl: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience.png",
-        iconX2Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png",
-        iconX3Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png")
+        iconUrl: "https://s3.amazonaws.com/smartapp-icons/Meta/light_outlet-luminance.png",
+        iconX2Url: "https://s3.amazonaws.com/smartapp-icons/Meta/light_outlet-luminance@2x.png")
 
 def setCurrentInstallNumber(installNumber) {
     state.automationInstallNumber = installNumber
@@ -67,19 +66,19 @@ def namePage() {
 def installed() {
     log.debug "Installed with settings: ${settings}"
     state.automationInstallNumber = parent.appInstalled()
+    state.virtualDeviceType = ""
     initialize()
 }
 
 def uninstalled() {
-    getAllChildDevices().each {
-        deleteChildDevice(it.deviceNetworkId, true)
-    }
+    unsubscribe()
+    removeAllChildren()
 }
 
 def updated() {
     log.debug "Updated with settings: ${settings}"
     unsubscribe()
-    uninstalled()
+    removeAllChildren()
     initialize()
 }
 
@@ -88,8 +87,9 @@ def updated() {
 def initialize() {
     def newDevice
     if (virtualDeviceType) {
-        log.debug "Install Number ${state.automationInstallNumber ?: 1}"
         newDevice = addChildDevice("daniel-growbuddy", virtualDeviceType, "virtual-$state.automationInstallNumber", theHub?.id, [completedSetup: true, label: deviceName])
+        log.debug "Created New Virtual Device"
+
     } else {
         log.error "Failed creating Virtual Device because the device type was missing"
     }
@@ -111,16 +111,22 @@ def initialize() {
 
 }
 
+def removeAllChildren(){
+    getAllChildDevices().each {
+        deleteChildDevice(it.deviceNetworkId, true)
+    }
+}
+
 
 def turnLightsOn(evt) {
     log.debug "Turn Lights On"
 
-    if(lightSwitch.off){
+    if(lightSwitch.currentValue("switch") == "off"){
         lightSwitch.on()
     }
 
     getAllChildDevices().each{
-        if(it.off){
+        if(it.currentValue("switch") == "off"){
             it.on()
         }
     }
@@ -131,12 +137,12 @@ def turnLightsOn(evt) {
 def turnLightsOff(evt) {
     log.debug "Turn Lights Off"
 
-    if(lightSwitch.on){
+    if(lightSwitch.currentValue("switch") == "on"){
         lightSwitch.off()
     }
 
     getAllChildDevices().each{
-        if(it.on){
+        if(it.currentValue("switch") == "on"){
             it.off()
         }
     }
@@ -146,7 +152,7 @@ def turnLightsOff(evt) {
 
 def colorHandler(evt) {
     log.debug "Color Lights"
-    def masterLight = getAllChildDevices.first()
+    def masterLight = (getAllChildDevices.size() > 0) ? getAllChildDevices.get(0) : null
 
     if(masterLight?.currentValue("switch") == "on"){
         log.debug "Changing Slave units H,S,L"
@@ -159,7 +165,7 @@ def colorHandler(evt) {
 }
 
 def tempHandler(evt){
-    def masterLight = getAllChildDevices.first()
+    def masterLight = (getAllChildDevices.size() > 0) ? getAllChildDevices.get(0) : null
 
     if(masterLight?.currentValue("switch") == "on"){
         if(evt.value != "--"){

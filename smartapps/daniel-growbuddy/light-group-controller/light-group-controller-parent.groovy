@@ -32,8 +32,8 @@ preferences {
 def installPage(){
     dynamicPage(name: "installPage", title:"Light Group Controller", install: true, uninstall: true) {
         if(!state?.controllerInstalled){
-            section("install"){
-                paragraph "Install Light Group Controller?"
+            section("Do you want to install the Light Group Controller?"){
+                paragraph "Use the install button in the top right of the screen."
             }
         }
 
