@@ -65,16 +65,12 @@ def updated() {
 
 def appInstalled(){
     state.nextDni++
+    return state.nextDni
 }
 
 def initialize(){
     log.debug "there are ${childApps.size()} child smartapps"
     childApps.each {child ->
         log.debug "child app: ${child.label}"
-    }
-
-    def theChild = findChildAppByName("Light Group Automation")
-    if(theChild != null){
-        theChild.setCurrentInstallNumber(state.nextDni)
     }
 }

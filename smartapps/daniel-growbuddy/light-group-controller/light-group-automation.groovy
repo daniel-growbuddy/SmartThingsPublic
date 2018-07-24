@@ -5,12 +5,15 @@ definition(
         description: "A simple app to control light group creation and basic lighting automations.",
         category: "My Apps",
 
-        // the parent option allows you to specify the parent app in the form <namespace>/<app name>
+        // the parent option allows you to specify the parent app in the form <namespace>/<app name> asdf
         parent: "daniel-growbuddy:Light Group Controller",
         iconUrl: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience.png",
         iconX2Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png",
         iconX3Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png")
 
+def setCurrentInstallNumber(installNumber) {
+    state.automationInstallNumber = installNumber
+}
 
 preferences {
     page name: "mainPage", title: "Group Lights & Switches for Automation", install: false, uninstall: true, nextPage: "lightPage"
@@ -19,11 +22,6 @@ preferences {
     page name: "namePage", title: "Group Lights & Switches for Automation", install: true, uninstall: true
 }
 
-def currentInstallNumber = 1
-
-def setCurrentInstallNumber(installNumber) {
-    currentInstallNumber = installNumber
-}
 
 // main page to select lights, the action, and turn on/off times
 def mainPage() {
@@ -32,10 +30,10 @@ def mainPage() {
             input "theHub", "hub", title: "Select the hub (required for local execution) (Optional)", multiple: false, required: false
         }
         section("Light Type"){
-            input "virtualDeviceType", "enum", title: "Which type of group/virtual device do you want to create?", multiple: false, required: true, options: ["Simulated RGBW Bulb"]
+            input "virtualDeviceType", "enum", title: "Which type of group/virtual device do you want to create?", multiple: false, required: true, options: ["Virtual RGBW Bulb"]
         }
         section("Light Control Device Name") {
-            input "deviceName", title: "Enter custom name for the control device", defaultValue: "Light Group ${currentInstallNumber}", required: true
+            input "deviceName", title: "Enter custom name for the control device", defaultValue: "My Light Bulb", required: true
 
         }
     }
@@ -44,15 +42,15 @@ def mainPage() {
 def lightPage() {
     dynamicPage(name: "lightPage") {
         section("Lights to Control"){
-            input "slaveLights", "capability.colorControl", title: "Which lights do you want to control?", multiple: true, submitOnChange: true
+            input "slaveLights", "capability.colorControl", title: "Which lights do you want to control?", multiple: true, required: true
         }
     }
 }
 
 def switchPage() {
-    dynamicPage(name: "lightPage") {
+    dynamicPage(name: "switchPage") {
         section("Light Switch for Control"){
-            input "lightSwitch", "capability.switch", title: "Which switch do you use to control the lights manually?", multiple: false, submitOnChange: true
+            input "lightSwitch", "capability.switch", title: "Which switch do you use to control the lights manually?", multiple: false, required: true
         }
     }
 }
@@ -68,8 +66,8 @@ def namePage() {
 
 def installed() {
     log.debug "Installed with settings: ${settings}"
+    state.automationInstallNumber = parent.appInstalled()
     initialize()
-    parent.appInstalled()
 }
 
 def uninstalled() {
@@ -88,66 +86,85 @@ def updated() {
 
 
 def initialize() {
+    def newDevice
     if (virtualDeviceType) {
-        def d = addChildDevice("smartthings", virtualDeviceType, "virtual-$currentInstallNumber", theHub?.id, [completedSetup: true, label: deviceName])
-        state.masterLight = d
+        log.debug "Install Number ${state.automationInstallNumber ?: 1}"
+        newDevice = addChildDevice("daniel-growbuddy", virtualDeviceType, "virtual-$state.automationInstallNumber", theHub?.id, [completedSetup: true, label: deviceName])
     } else {
         log.error "Failed creating Virtual Device because the device type was missing"
     }
 
-    subscribe(state.masterLight, "switch.on", turnLightsOn)
-    subscribe(state.masterLight, "switch.off", turnLightsOff)
-    subscribe(state.masterLight, "hue", colorHandler)
-    subscribe(state.masterLight, "saturation", colorHandler)
-    subscribe(state.masterLight, "level", colorHandler)
-    subscribe(state.masterLight, "colorTemperature", tempHandler)
+    log.debug "Device Type: $newDevice.deviceType"
 
-    subscribe(lightSwitch, "switch.on", turnLightsOn)
-    subscribe(lightSwitch, "switch.off", turnLightsOff)
+    if(newDevice){
+        log.debug "added subscriptions"
+        subscribe(newDevice, "switch.on", turnLightsOn)
+        subscribe(newDevice, "switch.off", turnLightsOff)
+        subscribe(newDevice, "hue", colorHandler)
+        subscribe(newDevice, "saturation", colorHandler)
+        subscribe(newDevice, "level", colorHandler)
+        subscribe(newDevice, "colorTemperature", tempHandler)
+
+        subscribe(lightSwitch, "switch.on", turnLightsOn)
+        subscribe(lightSwitch, "switch.off", turnLightsOff)
+    }
 
 }
 
 
 def turnLightsOn(evt) {
+    log.debug "Turn Lights On"
+
     if(lightSwitch.off){
         lightSwitch.on()
     }
 
-    if(state.virtualLight.off){
-        state.virtualLight.on()
+    getAllChildDevices().each{
+        if(it.off){
+            it.on()
+        }
     }
 
     slaveLights?.on()
 }
 
 def turnLightsOff(evt) {
+    log.debug "Turn Lights Off"
+
     if(lightSwitch.on){
         lightSwitch.off()
     }
 
-    if(state.virtualLight.on){
-        state.virtualLight.off()
+    getAllChildDevices().each{
+        if(it.on){
+            it.off()
+        }
     }
 
     slaveLights?.off()
 }
 
 def colorHandler(evt) {
-    if(state.masterLight?.currentValue("switch") == "on"){
+    log.debug "Color Lights"
+    def masterLight = getAllChildDevices.first()
+
+    if(masterLight?.currentValue("switch") == "on"){
         log.debug "Changing Slave units H,S,L"
-        def dimLevel = state.masterLight?.currentValue("level")
-        def hueLevel = state.masterLight?.currentValue("hue")
-        def saturationLevel = state.masterLight.currentValue("saturation")
+        def dimLevel = masterLight.currentValue("level")
+        def hueLevel = masterLight.currentValue("hue")
+        def saturationLevel = masterLight.currentValue("saturation")
         def newValue = [hue: hueLevel, saturation: saturationLevel, level: dimLevel as Integer]
         slaveLights?.setColor(newValue)
     }
 }
 
 def tempHandler(evt){
-    if(state.masterLight?.currentValue("switch") == "on"){
+    def masterLight = getAllChildDevices.first()
+
+    if(masterLight?.currentValue("switch") == "on"){
         if(evt.value != "--"){
             log.debug "Changing Slave color temp based on Master change"
-            def tempLevel = state.masterLight?.currentValue("colorTemperature")
+            def tempLevel = masterLight.currentValue("colorTemperature")
             slaveLights?.setColorTemperature(tempLevel)
         }
     }
